@@ -75,6 +75,39 @@ def load_income_data(input_file, sheet_name):
     data = raw.iloc[1:data_end].copy()  # 跳过表头行
     data.columns = header
 
+    # 只保留核心列（收入类型缺失时稍后生成）
+    needed_cols = ['项目', '名称', '金额']
+    for col in needed_cols:
+        if col not in data.columns:
+            raise ValueError(f'缺少必要列: {col}')
+
+    # 项目标准化：半日租→房费
+    data.loc[data['项目'] == '半日租', '项目'] = '房费'
+
+    # 收入类型提取函数：取名称首字符（Z/L/H/R/S/T），其他返回None
+    def derive_income_type(name: str):
+        if not isinstance(name, str):
+            return None
+        name = name.strip()
+        if not name:
+            return None
+        ch = name[0].upper()
+        return ch if ch in {'Z', 'L', 'H', 'R', 'S', 'T'} else None
+
+    # 若已有收入类型列，尝试对比自动提取
+    if '收入类型' in data.columns:
+        derived = data['名称'].apply(derive_income_type)
+        # 用自动提取填充缺失
+        data['收入类型'] = data['收入类型'].fillna(derived)
+        # 统计不一致
+        mismask = (data['收入类型'].notna()) & (derived.notna()) & (data['收入类型'].astype(str).str.strip() != derived.astype(str))
+        mismatch_count = int(mismask.sum())
+        total = len(data)
+        print(f"收入类型自动校验: 共{total}行，不一致 {mismatch_count} 行")
+    else:
+        data['收入类型'] = data['名称'].apply(derive_income_type)
+        print("收入类型列缺失，已按名称首字母自动提取")
+
     # 只保留核心列
     data = data[['项目', '名称', '收入类型', '金额']]
     data['金额'] = pd.to_numeric(data['金额'], errors='coerce').fillna(0)
