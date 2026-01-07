@@ -10,6 +10,8 @@ description: 生成总台财务数据汇总表，包含透视表、凭证说明�
 ```bash
 cd /Users/zengyuntan/python/凭证处理/2025年12月
 python3 scripts/generate_summary.py -i "12月总台.XLS.xlsx" -t 600240
+# 规范化总数表为长表（可选，用于提取转账等）
+python3 scripts/normalize_total.py -i "2025年10月总台测试.xlsx" -s "总数" -o "2025年10月总数_long.csv"
 ```
 
 ## 使用方式
@@ -74,6 +76,10 @@ python3 scripts/generate_summary.py \
 | 透视表 | 6-13 | H/L/R/S/T/Z 房费及合计 |
 | 凭证说明 | 16-21 | H/L/T/调整S凭证及合计 |
 | 验证 | 23-26 | 房费剩余 vs 凭证合计校验 |
+
+总数表规范化（可选）：
+- 输入：含科目代码/名称/借方/贷方的“总数”表。
+- 输出：长表列 `code,name,debit,credit,source_file,source_row`，便于程序化取数（如 `name == "转账"` 取贷方金额）。
 
 ## 公式引用链
 
