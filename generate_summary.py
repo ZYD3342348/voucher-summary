@@ -59,58 +59,48 @@ def create_workbook():
 
 def load_income_data(input_file, sheet_name):
     """
-    读取收入类型表的明细数据（透视表上方的明细区域）。
-    自动识别透视表起始行：第一列等于“收入类型”的行视为透视表表头。
+    直接从“工作表”生成明细：
+    - 假定列0=项目，列2=名称；自动检测金额列（数值最多的列）
+    - 去除名称空格，半日租→房费
+    - 收入类型=名称中首个英文字母（大写，Z/L/H/R/S/T）
     """
     raw = pd.read_excel(input_file, sheet_name=sheet_name, header=None)
+    raw.columns = range(raw.shape[1])
 
-    pivot_start = None
-    for idx, val in raw[0].items():
-        if str(val).strip() == '收入类型':
-            pivot_start = idx
-            break
+    # 跳过包含“项目”的表头行
+    start_row = 1 if raw.iloc[0].astype(str).str.contains('项目').any() else 0
+    data = raw.iloc[start_row:].copy()
 
-    header = raw.iloc[0]
-    data_end = pivot_start if pivot_start is not None else len(raw)
-    data = raw.iloc[1:data_end].copy()  # 跳过表头行
-    data.columns = header
+    # 固定列映射
+    data = data.rename(columns={0: '项目', 2: '名称'})
 
-    # 只保留核心列（收入类型缺失时稍后生成）
-    needed_cols = ['项目', '名称', '金额']
-    for col in needed_cols:
-        if col not in data.columns:
-            raise ValueError(f'缺少必要列: {col}')
+    # 自动检测金额列：数值最多的列
+    best_col, best_count = None, -1
+    for c in data.columns:
+        s = pd.to_numeric(data[c], errors='coerce')
+        cnt = s.notna().sum()
+        if cnt > best_count:
+            best_count, best_col = cnt, c
+    if best_col is None:
+        raise ValueError('未检测到金额列')
+    data = data.rename(columns={best_col: '金额'})
 
-    # 项目标准化：半日租→房费
+    # 清洗
+    data['名称'] = data['名称'].apply(lambda x: x.strip() if isinstance(x, str) else x)
+    data['金额'] = pd.to_numeric(data['金额'], errors='coerce')
+    data = data.dropna(subset=['金额'])
     data.loc[data['项目'] == '半日租', '项目'] = '房费'
 
-    # 收入类型提取函数：取名称首字符（Z/L/H/R/S/T），其他返回None
     def derive_income_type(name: str):
         if not isinstance(name, str):
             return None
-        name = name.strip()
-        if not name:
-            return None
-        ch = name[0].upper()
-        return ch if ch in {'Z', 'L', 'H', 'R', 'S', 'T'} else None
+        m = re.search(r'[A-Za-z]', name)
+        return m.group(0).upper() if m else None
 
-    # 若已有收入类型列，尝试对比自动提取
-    if '收入类型' in data.columns:
-        derived = data['名称'].apply(derive_income_type)
-        # 用自动提取填充缺失
-        data['收入类型'] = data['收入类型'].fillna(derived)
-        # 统计不一致
-        mismask = (data['收入类型'].notna()) & (derived.notna()) & (data['收入类型'].astype(str).str.strip() != derived.astype(str))
-        mismatch_count = int(mismask.sum())
-        total = len(data)
-        print(f"收入类型自动校验: 共{total}行，不一致 {mismatch_count} 行")
-    else:
-        data['收入类型'] = data['名称'].apply(derive_income_type)
-        print("收入类型列缺失，已按名称首字母自动提取")
+    data['收入类型'] = data['名称'].apply(derive_income_type)
 
-    # 只保留核心列
     data = data[['项目', '名称', '收入类型', '金额']]
-    data['金额'] = pd.to_numeric(data['金额'], errors='coerce').fillna(0)
+    data['金额'] = data['金额'].fillna(0)
     return data
 
 
