@@ -60,19 +60,34 @@ def create_workbook():
 def load_income_data(input_file, sheet_name):
     """
     直接从“工作表”生成明细：
-    - 假定列0=项目，列2=名称；自动检测金额列（数值最多的列）
+    - 优先根据内容定位列（含“项目”“名称”的行）；找不到则退回列0/列2
+    - 自动检测金额列（数值最多的列）
     - 去除名称空格，半日租→房费
     - 收入类型=名称中首个英文字母（大写，Z/L/H/R/S/T）
     """
     raw = pd.read_excel(input_file, sheet_name=sheet_name, header=None)
     raw.columns = range(raw.shape[1])
 
-    # 跳过包含“项目”的表头行
-    start_row = 1 if raw.iloc[0].astype(str).str.contains('项目').any() else 0
+    # 根据内容定位表头行与列索引
+    header_idx = None
+    col_project = col_name = None
+    for idx, row in raw.iterrows():
+        if row.astype(str).str.contains('项目').any() or row.astype(str).str.contains('名称').any():
+            header_idx = idx
+            if row.astype(str).str.contains('项目').any():
+                col_project = row[row.astype(str).str.contains('项目')].index.min()
+            if row.astype(str).str.contains('名称').any():
+                col_name = row[row.astype(str).str.contains('名称')].index.min()
+            break
+    # fallback
+    start_row = header_idx + 1 if header_idx is not None else 0
+    col_project = 0 if col_project is None else col_project
+    col_name = 2 if col_name is None else col_name
+
     data = raw.iloc[start_row:].copy()
 
     # 固定列映射
-    data = data.rename(columns={0: '项目', 2: '名称'})
+    data = data.rename(columns={col_project: '项目', col_name: '名称'})
 
     # 自动检测金额列：数值最多的列
     best_col, best_count = None, -1
