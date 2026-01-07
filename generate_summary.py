@@ -19,6 +19,7 @@
 """
 
 import pandas as pd
+import re
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
 from openpyxl.utils import get_column_letter
@@ -100,8 +101,16 @@ def load_income_data(input_file, sheet_name):
         raise ValueError('未检测到金额列')
     data = data.rename(columns={best_col: '金额'})
 
-    # 清洗
-    data['名称'] = data['名称'].apply(lambda x: x.strip() if isinstance(x, str) else x)
+    # 清洗：去空格，去掉下划线及其后缀（如 _ST_1）
+    def clean_name(name):
+        if not isinstance(name, str):
+            return name
+        name = name.strip()
+        if '_' in name:
+            name = name.split('_')[0].strip()
+        return name
+
+    data['名称'] = data['名称'].apply(clean_name)
     data['金额'] = pd.to_numeric(data['金额'], errors='coerce')
     data = data.dropna(subset=['金额'])
     data.loc[data['项目'] == '半日租', '项目'] = '房费'

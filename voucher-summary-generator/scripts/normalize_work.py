@@ -36,6 +36,15 @@ def derive_income_type(name: str):
     return m.group(0).upper() if m else None
 
 
+def clean_name(name: str):
+    if not isinstance(name, str):
+        return name
+    name = name.strip()
+    if "_" in name:
+        name = name.split("_")[0].strip()
+    return name
+
+
 def normalize_work(input_file: Path, sheet: str) -> pd.DataFrame:
     raw = pd.read_excel(input_file, sheet_name=sheet, header=None)
     raw.columns = range(raw.shape[1])
@@ -52,7 +61,7 @@ def normalize_work(input_file: Path, sheet: str) -> pd.DataFrame:
     data = data.rename(columns={amt_col: "金额"})
 
     # 清洗
-    data["名称"] = data["名称"].apply(lambda x: x.strip() if isinstance(x, str) else x)
+    data["名称"] = data["名称"].apply(clean_name)
     data["金额"] = pd.to_numeric(data["金额"], errors="coerce")
     data = data.dropna(subset=["金额"])
     # 半日租归并房费
