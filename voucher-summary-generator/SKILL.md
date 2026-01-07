@@ -13,6 +13,8 @@ python3 scripts/generate_summary.py -i "12月总台.XLS.xlsx" -t 600240
 # 规范化总数表为长表（可选，用于提取转账等）
 python3 scripts/normalize_total.py -i "2025年10月总台测试.xlsx" -s "总数" -o "2025年10月总数_long.csv"
 # 同时输出倒推校验汇总（银行/微信/现金/拉卡拉/财政、凭证贷方/借方、应挂账）
+# 规范化工作表明细（项目列0，名称列2，自动找金额列，提取收入类型）
+python3 scripts/normalize_work.py -i "2025年8月总台.xlsx" -s "工作表" -o "2025年8月_work_long.csv" -t 351260
 ```
 
 ## 使用方式
