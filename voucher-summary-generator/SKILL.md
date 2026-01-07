@@ -12,6 +12,7 @@ cd /Users/zengyuntan/python/凭证处理/2025年12月
 python3 scripts/generate_summary.py -i "12月总台.XLS.xlsx" -t 600240
 # 规范化总数表为长表（可选，用于提取转账等）
 python3 scripts/normalize_total.py -i "2025年10月总台测试.xlsx" -s "总数" -o "2025年10月总数_long.csv"
+# 同时输出倒推校验汇总（银行/微信/现金/拉卡拉/财政、凭证贷方/借方、应挂账）
 ```
 
 ## 使用方式
