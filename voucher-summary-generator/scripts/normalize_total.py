@@ -153,7 +153,7 @@ def main():
 
     inp = Path(args.input)
     df = normalize_total(inp, args.sheet)
-    df.to_csv(args.output, index=False)
+    df.to_csv(args.output, index=False, encoding="utf-8-sig")
     # 输出转账提示
     tx_rows = df[df["name"] == "转账"]
     if not tx_rows.empty:

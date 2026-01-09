@@ -85,7 +85,7 @@ def main():
 
     inp = Path(args.input)
     df = normalize_work(inp, args.sheet)
-    df.to_csv(args.output, index=False)
+    df.to_csv(args.output, index=False, encoding="utf-8-sig")
 
     print(f"[info] 已保存长表: {args.output}, 行数 {len(df)}")
     print("[info] 收入类型分布:")
