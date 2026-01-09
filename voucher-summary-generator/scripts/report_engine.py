@@ -26,7 +26,7 @@ def build_pivot(df: pd.DataFrame) -> pd.DataFrame:
     pivot = df.pivot_table(index="名称", columns="项目", values="金额", aggfunc="sum", fill_value=0)
     pivot["总计"] = pivot.sum(axis=1)
     pivot.loc["合计"] = pivot.sum()
-    return pivot
+    return pivot.round(2)
 
 
 def build_adjust_table(df: pd.DataFrame) -> pd.DataFrame:
@@ -62,12 +62,12 @@ def summarize_tax(adj: pd.DataFrame) -> pd.DataFrame:
     net5, taxamt5 = net_tax(tax5, 0.05)
     net6, taxamt6 = net_tax(tax6, 0.06)
 
-    rows.append(["不计税收入", notax, "", ""])
-    rows.append(["计税收入-5%", tax5, net5, taxamt5])
-    rows.append(["计税收入-6%", tax6, net6, taxamt6])
-    rows.append(["合计", notax + tax5 + tax6, net5 + net6, taxamt5 + taxamt6])
+    rows.append(["不计税收入", round(notax, 2), "", ""])
+    rows.append(["计税收入-5%", round(tax5, 2), round(net5, 2), round(taxamt5, 2)])
+    rows.append(["计税收入-6%", round(tax6, 2), round(net6, 2), round(taxamt6, 2)])
+    rows.append(["合计", round(notax + tax5 + tax6, 2), round(net5 + net6, 2), round(taxamt5 + taxamt6, 2)])
 
-    return pd.DataFrame(rows, columns=["类别", "含税收入", "不含税收入", "税额"])
+    return pd.DataFrame(rows, columns=["类别", "含税收入", "不含税收入", "税额"]).round(2)
 
 
 def write_df(ws, df: pd.DataFrame, start_row=1, start_col=1):
