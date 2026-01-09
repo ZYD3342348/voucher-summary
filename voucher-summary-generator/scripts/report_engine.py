@@ -70,6 +70,49 @@ def summarize_tax(adj: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=["类别", "含税收入", "不含税收入", "税额"]).round(2)
 
 
+def summarize_tax_by_project(adj: pd.DataFrame) -> pd.DataFrame:
+    """按项目维度汇总分桶与税额。"""
+    proj_rows = []
+    for proj, grp in adj.groupby("项目"):
+        notax = grp["不计税收入"].sum()
+        tax5 = grp["计税收入-5%"].sum()
+        tax6 = grp["计税收入-6%"].sum()
+
+        def net_tax(amount, rate):
+            if amount <= 0:
+                return 0.0, 0.0
+            net = amount / (1 + rate)
+            tax = amount - net
+            return net, tax
+
+        net5, taxamt5 = net_tax(tax5, 0.05)
+        net6, taxamt6 = net_tax(tax6, 0.06)
+
+        proj_rows.append({
+            "项目": proj,
+            "不计税收入": round(notax, 2),
+            "计税收入-5%": round(tax5, 2),
+            "计税收入-6%": round(tax6, 2),
+            "含税收入合计": round(notax + tax5 + tax6, 2),
+            "不含税收入": round(net5 + net6, 2),
+            "税额": round(taxamt5 + taxamt6, 2),
+        })
+
+    df_proj = pd.DataFrame(proj_rows)
+    if not df_proj.empty:
+        total_row = {
+            "项目": "合计",
+            "不计税收入": df_proj["不计税收入"].sum(),
+            "计税收入-5%": df_proj["计税收入-5%"].sum(),
+            "计税收入-6%": df_proj["计税收入-6%"].sum(),
+            "含税收入合计": df_proj["含税收入合计"].sum(),
+            "不含税收入": df_proj["不含税收入"].sum(),
+            "税额": df_proj["税额"].sum(),
+        }
+        df_proj = pd.concat([df_proj, pd.DataFrame([total_row])], ignore_index=True)
+    return df_proj.round(2)
+
+
 def write_df(ws, df: pd.DataFrame, start_row=1, start_col=1):
     for j, col in enumerate(df.columns, start=start_col):
         ws.cell(row=start_row, column=j, value=col)
@@ -99,6 +142,7 @@ def main():
     adj = build_adjust_table(df)
     # 摘要
     summary = summarize_tax(adj)
+    summary_proj = summarize_tax_by_project(adj)
 
     wb = Workbook()
     ws_pivot = wb.active
@@ -110,6 +154,9 @@ def main():
 
     ws_sum = wb.create_sheet("税分拆摘要")
     write_df(ws_sum, summary)
+
+    ws_proj = wb.create_sheet("项目税分拆")
+    write_df(ws_proj, summary_proj)
 
     wb.save(out)
     print(f"[info] 已生成 {out}；透视行数 {len(pivot)}，调整行数 {len(adj)}")
