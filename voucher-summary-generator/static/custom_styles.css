@@ -1,0 +1,431 @@
+/* ===== AI Studio Inspired Custom Styles for Voucher Summary Generator ===== */
+
+/* Fonts (offline-friendly)
+   默认不依赖联网字体；如需在线字体，可自行取消注释下方 @import。 */
+/* @import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@500&family=Noto+Serif+SC:wght@400;700&family=Playfair+Display:ital,wght@0,400;0,600;1,400&display=swap'); */
+
+/* CSS Variables System */
+:root {
+    /* Color Palette - Aligned with ai_studio_code.html */
+    --bg-color: #F3F1E8;
+    --gold-color: #BF9E6B;
+    --teal-color: #2F9CAD;
+    --green-color: #6E8A5F;
+    --pink-color: #D68BB3;
+    --dark-green: #5D7230;
+    --blue-accent: #6FAED6;
+    
+    /* Extended Color System */
+    --primary: var(--gold-color);
+    --secondary: var(--teal-color);
+    --accent: var(--pink-color);
+    --background: var(--bg-color);
+    --surface: #FFFFFF;
+    --text-primary: #2C2C2C;
+    --text-secondary: #666666;
+    --text-disabled: #999999;
+    
+    /* Shadows */
+    --shadow-sm: 0 2px 4px rgba(0,0,0,0.1);
+    --shadow-md: 0 4px 8px rgba(0,0,0,0.15);
+    --shadow-lg: 0 8px 16px rgba(0,0,0,0.2);
+    --shadow-xl: 0 20px 50px rgba(0,0,0,0.5);
+    
+    /* Spacing */
+    --space-xs: 4px;
+    --space-sm: 8px;
+    --space-md: 16px;
+    --space-lg: 24px;
+    --space-xl: 32px;
+    --space-2xl: 48px;
+    
+    /* Border Radius */
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-xl: 20px;
+
+    /* Font stacks (prefer local/system; keep Google fonts as optional first choice if installed) */
+    --font-cn: "Noto Serif SC", "Songti SC", "STSong", "SimSun", "Microsoft YaHei", ui-serif, serif;
+    --font-hand: "Dancing Script", "Segoe Script", "Bradley Hand", cursive;
+}
+
+/* Global Styles */
+.stApp {
+    background: linear-gradient(135deg, #f5f3ed 0%, #ede8db 100%);
+    font-family: var(--font-cn);
+}
+
+/* Streamlit Layout */
+.main .block-container {
+    padding-top: 2rem;
+    max-width: 1200px;
+}
+
+/* Main Container Styling */
+.main-container {
+    background-color: var(--bg-color);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-xl);
+    margin: var(--space-lg);
+    padding: var(--space-xl);
+    position: relative;
+    overflow: hidden;
+    
+    /* Paper texture effect */
+    background-image: radial-gradient(#e6e2d3 1px, transparent 1px);
+    background-size: 20px 20px;
+}
+
+/* Header Styling */
+.main-header,
+.main-title {
+    text-align: center;
+    margin-bottom: var(--space-2xl);
+    position: relative;
+    padding: var(--space-xl);
+    background: linear-gradient(45deg, #B59A6D, #DECBA4, #B59A6D);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-family: var(--font-cn);
+    font-size: 2.5rem;
+    font-weight: 700;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+}
+
+/* Decorative Header Border */
+.main-header::before,
+.main-title::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100px;
+    height: 4px;
+    background: linear-gradient(90deg, transparent, var(--gold-color), transparent);
+    border-radius: 2px;
+}
+
+/* Subheader Styling */
+.subheader,
+.sub-title {
+    color: var(--gold-color);
+    font-family: var(--font-hand);
+    font-size: 1.8rem;
+    text-align: center;
+    margin: var(--space-lg) 0;
+    transform: rotate(-2deg);
+    opacity: 0.9;
+}
+
+/* Card Components */
+.info-card {
+    background: rgba(255, 255, 255, 0.8);
+    border: 2px solid var(--gold-color);
+    border-radius: var(--radius-lg);
+    padding: var(--space-lg);
+    margin: var(--space-md) 0;
+    box-shadow: var(--shadow-md);
+    position: relative;
+    backdrop-filter: blur(10px);
+}
+
+.info-card::before {
+    content: '❧';
+    position: absolute;
+    top: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg-color);
+    color: var(--gold-color);
+    padding: 0 var(--space-sm);
+    font-size: 1.2rem;
+}
+
+/* Button Styling */
+.stButton > button {
+    background: linear-gradient(45deg, var(--gold-color), #D4B876);
+    border: none;
+    border-radius: var(--radius-md);
+    color: white;
+    font-weight: 600;
+    padding: var(--space-sm) var(--space-lg);
+    box-shadow: var(--shadow-md);
+    transition: all 0.3s ease;
+    font-family: var(--font-cn);
+}
+
+.stButton > button:hover {
+    background: linear-gradient(45deg, #D4B876, var(--gold-color));
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+
+/* File Uploader Styling */
+.stFileUploader {
+    border: 3px dashed var(--gold-color);
+    border-radius: var(--radius-lg);
+    padding: var(--space-2xl);
+    background: rgba(191, 158, 107, 0.05);
+    text-align: center;
+    transition: all 0.3s ease;
+}
+
+.stFileUploader:hover {
+    border-color: var(--teal-color);
+    background: rgba(47, 156, 173, 0.05);
+}
+
+/* Sidebar Styling */
+section[data-testid="stSidebar"],
+.css-1d391kg {
+    background: linear-gradient(180deg, var(--bg-color) 0%, #e8e2d1 100%) !important;
+    border-right: 2px solid var(--gold-color);
+}
+
+section[data-testid="stSidebar"] > div,
+.css-1v3fvcr {
+    background: rgba(255, 255, 255, 0.9) !important;
+    backdrop-filter: blur(10px);
+}
+
+/* Select Box Styling */
+.stSelectbox > div > div {
+    background: rgba(255, 255, 255, 0.9);
+    border: 2px solid var(--gold-color);
+    border-radius: var(--radius-md);
+    font-family: var(--font-cn);
+}
+
+/* Radio Button Styling */
+.stRadio > div {
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: var(--radius-md);
+    padding: var(--space-sm);
+    border: 1px solid var(--gold-color);
+}
+
+/* Multiselect Styling */
+.stMultiSelect > div > div {
+    background: rgba(255, 255, 255, 0.9);
+    border: 2px solid var(--gold-color);
+    border-radius: var(--radius-md);
+    font-family: var(--font-cn);
+}
+
+/* Text Area Styling */
+.stTextArea > div > div {
+    background: rgba(255, 255, 255, 0.9);
+    border: 2px solid var(--gold-color);
+    border-radius: var(--radius-md);
+    font-family: var(--font-cn);
+}
+
+/* Number Input Styling */
+.stNumberInput > div > div {
+    background: rgba(255, 255, 255, 0.9);
+    border: 2px solid var(--gold-color);
+    border-radius: var(--radius-md);
+    font-family: var(--font-cn);
+}
+
+/* Tabs Styling */
+.stTabs [data-baseweb="tab-list"] {
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    border-bottom: 3px solid var(--gold-color);
+}
+
+.stTabs [data-baseweb="tab"] {
+    background: rgba(255, 255, 255, 0.6);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    color: var(--text-secondary);
+    font-family: var(--font-cn);
+    font-weight: 600;
+    margin: 0 var(--space-xs);
+}
+
+.stTabs [aria-selected="true"] {
+    background: linear-gradient(45deg, var(--gold-color), #D4B876);
+    color: white !important;
+    box-shadow: var(--shadow-md);
+}
+
+/* DataFrame Styling */
+.stDataFrame {
+    border: 2px solid var(--gold-color);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+}
+
+.stDataFrame th {
+    background: linear-gradient(45deg, var(--gold-color), #D4B876);
+    color: white;
+    font-family: var(--font-cn);
+    font-weight: 700;
+    padding: var(--space-sm) var(--space-md);
+}
+
+.stDataFrame td {
+    background: rgba(255, 255, 255, 0.9);
+    font-family: var(--font-cn);
+    padding: var(--space-sm) var(--space-md);
+    border-bottom: 1px solid rgba(191, 158, 107, 0.2);
+}
+
+/* Success/Error Message Styling */
+.stAlert {
+    border-radius: var(--radius-md);
+    border-left: 6px solid var(--gold-color);
+    font-family: var(--font-cn);
+}
+
+.stSuccess {
+    background: rgba(110, 138, 95, 0.1);
+    border-left-color: var(--green-color);
+}
+
+.stError {
+    background: rgba(214, 139, 179, 0.1);
+    border-left-color: var(--pink-color);
+}
+
+/* Download Button Styling */
+.stDownloadButton > button {
+    background: linear-gradient(45deg, var(--teal-color), #4FB8C6);
+    border: none;
+    border-radius: var(--radius-md);
+    color: white;
+    font-weight: 600;
+    padding: var(--space-sm) var(--space-lg);
+    box-shadow: var(--shadow-md);
+    transition: all 0.3s ease;
+    font-family: var(--font-cn);
+}
+
+.stDownloadButton > button:hover {
+    background: linear-gradient(45deg, #4FB8C6, var(--teal-color));
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+
+/* Metric Styling */
+.stMetric {
+    background: rgba(255, 255, 255, 0.9);
+    border: 2px solid var(--gold-color);
+    border-radius: var(--radius-lg);
+    padding: var(--space-lg);
+    text-align: center;
+    box-shadow: var(--shadow-md);
+    font-family: var(--font-cn);
+}
+
+.stMetricLabel {
+    color: var(--text-secondary) !important;
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.stMetricValue {
+    color: var(--gold-color) !important;
+    font-weight: 700 !important;
+    font-size: 1.5rem !important;
+}
+
+/* Expander Styling */
+.streamlit-expanderHeader {
+    background: rgba(255, 255, 255, 0.8);
+    border: 2px solid var(--gold-color);
+    border-radius: var(--radius-md);
+    font-family: var(--font-cn);
+    font-weight: 600;
+}
+
+/* Progress Bar Styling */
+.stProgress > div > div {
+    background: linear-gradient(45deg, var(--gold-color), #D4B876);
+}
+
+/* Loading Spinner */
+.stSpinner {
+    border-top-color: var(--gold-color) !important;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-color);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--gold-color);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #D4B876;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .main-container {
+        margin: var(--space-sm);
+        padding: var(--space-md);
+    }
+    
+    .main-header {
+        font-size: 1.8rem;
+    }
+    
+    .subheader {
+        font-size: 1.4rem;
+    }
+}
+
+/* Animation Classes */
+.fade-in {
+    animation: fadeIn 0.6s ease-in;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.slide-in {
+    animation: slideIn 0.8s ease-out;
+}
+
+@keyframes slideIn {
+    from { transform: translateX(-50px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+/* Decorative Elements */
+.decorative-corner::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(45deg, var(--gold-color), transparent);
+    border-radius: 0 0 100% 0;
+}
+
+.decorative-corner::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(225deg, var(--gold-color), transparent);
+    border-radius: 100% 0 0 0;
+}

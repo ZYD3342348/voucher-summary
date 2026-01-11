@@ -3,6 +3,8 @@
 *.xls
 *.XLS
 *.XLSX
+*.rar
+*.csv
 
 # OS files
 .DS_Store
@@ -12,3 +14,15 @@ Thumbs.db
 __pycache__/
 *.pyc
 *.pyo
+
+# Local env / tooling
+.venv/
+venv/
+.streamlit/
+
+# Local assets & data (not for repo)
+image/
+测试数据/
+
+# Local backups / scratch
+*backup*.py

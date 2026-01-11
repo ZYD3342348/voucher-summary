@@ -17,6 +17,15 @@ python3 scripts/normalize_total.py -i "2025年10月总台测试.xlsx" -s "总数
 python3 scripts/normalize_work.py -i "2025年8月总台.xlsx" -s "工作表" -o "2025年8月_work_long.csv" -t 351260
 ```
 
+## Web 界面（Streamlit）
+
+```bash
+cd /Users/zengyuntan/python/凭证处理/2025年12月/voucher-summary-generator
+streamlit run app.py
+# 若本机 streamlit 命令报 “bad interpreter”，用：
+python3 -m streamlit run app.py
+```
+
 ## 使用方式
 
 ### 方式一：命令行参数（推荐）

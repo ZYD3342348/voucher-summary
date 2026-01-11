@@ -17,6 +17,17 @@ from pathlib import Path
 import pandas as pd
 
 
+def _clean_cell(v):
+    if v is None:
+        return None
+    if isinstance(v, float) and pd.isna(v):
+        return None
+    if isinstance(v, str):
+        v = v.strip()
+        return v if v != "" else None
+    return v
+
+
 def _locate_header(df: pd.DataFrame):
     """
     根据“名称”行定位表头；借方/贷方可在该行或前几行找到。
@@ -76,11 +87,17 @@ def normalize_total(input_file: Path, sheet: str) -> pd.DataFrame:
         credit = row[col_credit] if col_credit is not None and col_credit in row else None
         code = row[col_code] if col_code is not None and col_code in row else None
 
+        name = _clean_cell(name)
+        code = _clean_cell(code)
+
         # 跳过合计行
         if isinstance(name, str) and "合计" in name:
             continue
-        if isinstance(name, str):
-            name = name.strip()
+
+        # 跳过“总计/合计”等空白名称的尾部汇总行（常见：code/name 为空，但借贷方给出总额）
+        if name is None and code is None:
+            continue
+
         # 过滤全空行
         if (name is None or name == "") and pd.isna(debit) and pd.isna(credit):
             continue
@@ -88,7 +105,7 @@ def normalize_total(input_file: Path, sheet: str) -> pd.DataFrame:
         records.append(
             {
                 "code": code,
-                "name": name if name != "" else None,
+                "name": name,
                 "debit": float(debit) if isinstance(debit, (int, float)) and not pd.isna(debit) else None,
                 "credit": float(credit) if isinstance(credit, (int, float)) and not pd.isna(credit) else None,
                 "source_file": input_file.name,

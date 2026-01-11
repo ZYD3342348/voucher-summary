@@ -101,27 +101,28 @@ def load_income_data(input_file, sheet_name):
         raise ValueError('未检测到金额列')
     data = data.rename(columns={best_col: '金额'})
 
-    # 清洗：去空格，去掉下划线及其后缀（如 _ST_1）
+    # 清洗：定位到第一个英文字母（收入类型），去掉其后“_及其后缀”（如 _ST_1）
     def clean_name(name):
         if not isinstance(name, str):
             return name
-        name = name.strip()
-        if '_' in name:
-            name = name.split('_')[0].strip()
-        return name
+        s = re.sub(r'\s+', '', name)
+        if '_' in s:
+            s = s.split('_')[0].strip()
+        return s
 
+    # 先提取收入类型，再按 "_" 清洗名称（对齐人工：先取首字母，再分列）
+    def derive_income_type(name: str):
+        if not isinstance(name, str):
+            return None
+        s = re.sub(r'\s+', '', name)
+        m = re.search(r'[A-Za-z]', s)
+        return m.group(0).upper() if m else None
+
+    data['收入类型'] = data['名称'].apply(derive_income_type)
     data['名称'] = data['名称'].apply(clean_name)
     data['金额'] = pd.to_numeric(data['金额'], errors='coerce')
     data = data.dropna(subset=['金额'])
     data.loc[data['项目'] == '半日租', '项目'] = '房费'
-
-    def derive_income_type(name: str):
-        if not isinstance(name, str):
-            return None
-        m = re.search(r'[A-Za-z]', name)
-        return m.group(0).upper() if m else None
-
-    data['收入类型'] = data['名称'].apply(derive_income_type)
 
     data = data[['项目', '名称', '收入类型', '金额']]
     data['金额'] = data['金额'].fillna(0)
