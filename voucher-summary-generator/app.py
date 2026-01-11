@@ -23,6 +23,9 @@ from typing import Optional, Tuple
 import pandas as pd
 import streamlit as st
 
+# 必须是脚本中第一条 Streamlit 命令（且只能调用一次）
+st.set_page_config(page_title="总台收入工作台", layout="wide")
+
 # 确保 scripts 可导入
 BASE = Path(__file__).resolve().parent
 PARENT = BASE.parent
@@ -292,10 +295,8 @@ def build_total_summary(total_long: pd.DataFrame, transfer_credit: float, match_
 
 
 def main():
-    # 加载自定义CSS样式
+    # 加载自定义CSS样式（在 set_page_config 之后）
     load_custom_css()
-    
-    st.set_page_config(page_title="总台收入工作台", layout="wide")
     
     # 自定义标题区域
     st.markdown("""
