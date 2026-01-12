@@ -16,6 +16,7 @@
 import io
 import sys
 import tempfile
+import time
 from pathlib import Path
 import hashlib
 from typing import Optional, Tuple
@@ -66,6 +67,8 @@ def to_number(s: pd.Series) -> pd.Series:
 
 
 ALLOCATION_COLS = ("不计税分配", "计税分配-5%", "计税分配-6%")
+ALLOCATION_INPUT_COLS = ("不计税分配", "计税分配-5%")
+ALLOCATION_AUTO_COL = "计税分配-6%"
 
 DEFAULT_TOTAL_MATCH = {
     "银行": ["银行转账", "银行转帐", "银行", "银行汇总", "AR支票预收"],
@@ -144,6 +147,79 @@ def build_allocation_table(df: pd.DataFrame) -> pd.DataFrame:
     alloc["计税分配-6%"] = alloc["金额"].astype(float)
     alloc["备注"] = ""
     return alloc
+
+
+def _recalc_alloc_tax6_and_validate(alloc: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
+    """
+    规则：
+    - 行内恒等式：不计税 + 5% + 6% = 金额
+    - 6% 为补差列（自动计算），禁止手填（UI 层会禁用该列）
+    - 正数金额行：不允许超额（即 6% 不得为负）；且不允许输入负数分配
+    - 负数金额行：允许分配为负，但不允许“超额到更负”（即 6% 不得为正）
+    """
+    df = alloc.copy()
+
+    # 确保列存在
+    if "金额" not in df.columns:
+        df["金额"] = 0.0
+    for c in ALLOCATION_INPUT_COLS:
+        if c not in df.columns:
+            df[c] = 0.0
+    if "备注" not in df.columns:
+        df["备注"] = ""
+
+    # 数字化
+    df["金额"] = to_number(df["金额"])
+    for c in ALLOCATION_INPUT_COLS:
+        df[c] = to_number(df[c])
+
+    # 自动补差：6% = 金额 - 不计税 - 5%
+    df[ALLOCATION_AUTO_COL] = (df["金额"] - df[ALLOCATION_INPUT_COLS[0]] - df[ALLOCATION_INPUT_COLS[1]]).round(2)
+    # 消除 -0.0
+    df.loc[df[ALLOCATION_AUTO_COL].abs() < 0.005, ALLOCATION_AUTO_COL] = 0.0
+
+    errors: list[str] = []
+    eps = 1e-9
+    for i, row in df.iterrows():
+        amt = float(row.get("金额", 0.0))
+        notax = float(row.get(ALLOCATION_INPUT_COLS[0], 0.0))
+        tax5 = float(row.get(ALLOCATION_INPUT_COLS[1], 0.0))
+        tax6 = float(row.get(ALLOCATION_AUTO_COL, 0.0))
+        name = str(row.get("名称", "")).strip()
+        proj = str(row.get("项目", "")).strip()
+        rid = f"{name}/{proj}".strip("/") or f"行{i + 1}"
+
+        if amt >= 0:
+            if notax < -eps or tax5 < -eps:
+                errors.append(f"{rid}：金额为正时，不计税/5% 不允许为负数。")
+                continue
+            if tax6 < -eps:
+                errors.append(f"{rid}：不允许超额（不计税+5% 不能超过 金额）。")
+                continue
+        else:
+            if notax > eps or tax5 > eps:
+                errors.append(f"{rid}：金额为负时，不计税/5% 必须为负数或 0。")
+                continue
+            if tax6 > eps:
+                errors.append(f"{rid}：不允许超额（不计税+5% 不能小于 金额）。")
+                continue
+
+    return df, errors
+
+
+@st.cache_data(show_spinner=False)
+def cached_normalize_work(xlsx_path: str, sheet: str) -> pd.DataFrame:
+    return normalize_work(Path(xlsx_path), sheet)
+
+
+@st.cache_data(show_spinner=False)
+def cached_normalize_total(xlsx_path: str, sheet: str) -> pd.DataFrame:
+    return normalize_total(Path(xlsx_path), sheet)
+
+
+@st.cache_data(show_spinner=False)
+def cached_sheet_names(xlsx_path: str) -> list[str]:
+    return get_sheet_names(Path(xlsx_path))
 
 
 def summarize_tax(alloc: pd.DataFrame) -> pd.DataFrame:
@@ -293,8 +369,8 @@ def build_total_summary(total_long: pd.DataFrame, transfer_credit: float, match_
     }, hit_tables)
 
 
-def render_uploaded_file(tmp_path: Path, file_id: str):
-    sheet_names = get_sheet_names(tmp_path)
+def render_uploaded_file(xlsx_path: Path, file_id: str):
+    sheet_names = cached_sheet_names(str(xlsx_path))
     default_work = pick_default_sheet(sheet_names, "工作表")
     default_total = pick_default_sheet(sheet_names, "总数")
 
@@ -351,12 +427,12 @@ def render_uploaded_file(tmp_path: Path, file_id: str):
         errors.append("未选择收入类型（至少选择 1 个）。")
 
     try:
-        work_long = normalize_work(tmp_path, work_sheet)
+        work_long = cached_normalize_work(str(xlsx_path), work_sheet)
     except Exception as e:
         errors.append(f"读取/规范化工作表失败：{e}")
 
     try:
-        total_long = normalize_total(tmp_path, total_sheet)
+        total_long = cached_normalize_total(str(xlsx_path), total_sheet)
     except Exception as e:
         errors.append(f"读取/规范化总数表失败：{e}")
 
@@ -416,14 +492,42 @@ def render_uploaded_file(tmp_path: Path, file_id: str):
                 pivot = build_pivot(work_filtered)
             st.dataframe(pivot, use_container_width=True)
 
-            st.markdown("##### ⚙️ 分配管理（可编辑：不计税 / 5% / 6%）")
-            alloc_default = build_allocation_table(work_filtered)
+            st.markdown("##### ⚙️ 分配管理（可编辑：不计税 / 5%，6% 自动补差）")
 
-            if alloc_state_key not in st.session_state:
-                st.session_state[alloc_state_key] = alloc_default
+            alloc_default_raw = build_allocation_table(work_filtered)
+            alloc_default, _ = _recalc_alloc_tax6_and_validate(alloc_default_raw)
 
-            alloc = st.data_editor(
-                st.session_state[alloc_state_key],
+            alloc_draft_key = f"alloc_draft:{state_prefix}"
+            alloc_valid_key = f"alloc_valid:{state_prefix}"
+            alloc_committed_key = f"alloc_committed:{state_prefix}"
+            alloc_edit_error_key = f"alloc_edit_error:{state_prefix}"
+            alloc_commit_ts_key = f"alloc_commit_ts:{state_prefix}"
+
+            if alloc_draft_key not in st.session_state:
+                st.session_state[alloc_draft_key] = alloc_default
+                st.session_state[alloc_valid_key] = alloc_default
+                st.session_state[alloc_committed_key] = alloc_default
+
+            # 展示并清理上一次“非法编辑回退”的原因（让用户知道为什么输入没生效）
+            if alloc_edit_error_key in st.session_state:
+                msgs = st.session_state.pop(alloc_edit_error_key)
+                st.error("分配填写不合法：已恢复到上一次有效值。")
+                with st.expander("查看原因", expanded=False):
+                    for m in msgs:
+                        st.write(f"- {m}")
+
+            draft_in = st.session_state[alloc_draft_key]
+            draft_in, draft_errs = _recalc_alloc_tax6_and_validate(draft_in)
+            if draft_errs:
+                # 理论上不应发生；兜底恢复到默认
+                st.session_state[alloc_draft_key] = alloc_default
+                st.session_state[alloc_valid_key] = alloc_default
+            else:
+                st.session_state[alloc_draft_key] = draft_in
+                st.session_state[alloc_valid_key] = draft_in
+
+            alloc_draft = st.data_editor(
+                st.session_state[alloc_draft_key],
                 key=f"editor:{state_prefix}",
                 num_rows="dynamic",
                 use_container_width=True,
@@ -431,16 +535,58 @@ def render_uploaded_file(tmp_path: Path, file_id: str):
                     "名称": st.column_config.TextColumn("名称", disabled=True),
                     "项目": st.column_config.TextColumn("项目", disabled=True),
                     "金额": st.column_config.NumberColumn("金额", disabled=True, format="%.2f"),
+                    "不计税分配": st.column_config.NumberColumn("不计税分配", format="%.2f"),
+                    "计税分配-5%": st.column_config.NumberColumn("计税分配-5%", format="%.2f"),
+                    "计税分配-6%": st.column_config.NumberColumn("计税分配-6%", disabled=True, format="%.2f"),
                 },
             )
-            st.session_state[alloc_state_key] = alloc
+
+            alloc_draft_fixed, alloc_draft_errs = _recalc_alloc_tax6_and_validate(alloc_draft)
+            if alloc_draft_errs:
+                st.session_state[alloc_edit_error_key] = alloc_draft_errs
+                st.session_state[alloc_draft_key] = st.session_state.get(alloc_valid_key, alloc_default)
+                st.rerun()
+            else:
+                st.session_state[alloc_draft_key] = alloc_draft_fixed
+                st.session_state[alloc_valid_key] = alloc_draft_fixed
+                # 6% 是补差列：编辑不计税/5% 后，主动 rerun 一次以立即刷新表格显示的 6%
+                try:
+                    prev_tax6 = to_number(alloc_draft.get(ALLOCATION_AUTO_COL, pd.Series(dtype=float))).round(2)
+                    next_tax6 = to_number(alloc_draft_fixed.get(ALLOCATION_AUTO_COL, pd.Series(dtype=float))).round(2)
+                    if not prev_tax6.equals(next_tax6):
+                        st.rerun()
+                except Exception:
+                    pass
+
+            alloc_effective = st.session_state.get(alloc_committed_key, alloc_default)
+            alloc_effective, eff_errs = _recalc_alloc_tax6_and_validate(alloc_effective)
+            if eff_errs:
+                # 兜底：让已生效分配始终是“可计算”的
+                alloc_effective = st.session_state.get(alloc_valid_key, alloc_default)
+                alloc_effective, _ = _recalc_alloc_tax6_and_validate(alloc_effective)
+                st.session_state[alloc_committed_key] = alloc_effective
+
+            alloc = alloc_effective
 
             c1, c2 = st.columns([1, 3])
             with c1:
                 if st.button("🔄 重新计算", type="primary"):
+                    st.session_state[alloc_committed_key] = st.session_state[alloc_draft_key].copy()
+                    st.session_state[alloc_commit_ts_key] = time.time()
                     st.rerun()
             with c2:
-                st.caption('编辑后按回车或点出单元格，再点“重新计算”，即可按当前分配重新生成校验/税分拆/导出。')
+                committed_ts = st.session_state.get(alloc_commit_ts_key)
+                if committed_ts:
+                    st.caption(f'提示：校验/税分拆/导出以“上次点击重新计算”的分配为准（上次：{time.strftime("%H:%M:%S", time.localtime(committed_ts))}）。')
+                else:
+                    st.caption('提示：校验/税分拆/导出以“点击重新计算”时的分配为准。')
+
+            try:
+                dirty = not st.session_state[alloc_draft_key].equals(st.session_state[alloc_committed_key])
+            except Exception:
+                dirty = True
+            if dirty:
+                st.info("当前分配表为“草稿”：编辑器里 6% 会自动补差；校验/税分拆/导出不会变化，需点“重新计算”后才更新。")
 
             st.markdown("##### ✅ 校验分析（分配平衡检查）")
             validations = build_validation_tables(alloc)
@@ -660,7 +806,6 @@ def render_uploaded_file(tmp_path: Path, file_id: str):
             </div>
         """, unsafe_allow_html=True)
 
-
 def main():
     # 加载自定义CSS样式（在 set_page_config 之后）
     load_custom_css()
@@ -693,15 +838,27 @@ def main():
     upload_bytes = uploaded.getvalue()
     file_id = stable_file_id(upload_bytes)
 
-    tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
-    tmp_path = Path(tmp_file.name)
-    tmp_file.close()
-    try:
-        tmp_path.write_bytes(upload_bytes)
-        render_uploaded_file(tmp_path, file_id)
-    finally:
-        # 清理临时文件（不影响导出：导出已在内存）
-        tmp_path.unlink(missing_ok=True)
+    # 上传文件落盘一次并复用：避免编辑单元格时反复写临时文件/重读 Excel
+    uploaded_id_key = "uploaded_file_id"
+    uploaded_path_key = "uploaded_xlsx_path"
+    prev_id = st.session_state.get(uploaded_id_key)
+    prev_path = st.session_state.get(uploaded_path_key)
+
+    if prev_id != file_id or not prev_path or not Path(str(prev_path)).exists():
+        if prev_path:
+            try:
+                Path(str(prev_path)).unlink(missing_ok=True)
+            except Exception:
+                pass
+
+        suffix = Path(getattr(uploaded, "name", "")).suffix or ".xlsx"
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            tmp.write(upload_bytes)
+            st.session_state[uploaded_id_key] = file_id
+            st.session_state[uploaded_path_key] = tmp.name
+
+    xlsx_path = Path(st.session_state[uploaded_path_key])
+    render_uploaded_file(xlsx_path, file_id)
 
 
 if __name__ == "__main__":
