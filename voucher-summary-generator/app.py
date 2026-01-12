@@ -56,9 +56,8 @@ def load_custom_css():
 
 
 
-def stable_file_id(uploaded: "st.runtime.uploaded_file_manager.UploadedFile") -> str:
+def stable_file_id(data: bytes) -> str:
     # 用内容 hash 做 session key，避免同名文件冲突
-    data = uploaded.getvalue()
     return hashlib.sha1(data).hexdigest()
 
 
@@ -294,42 +293,7 @@ def build_total_summary(total_long: pd.DataFrame, transfer_credit: float, match_
     }, hit_tables)
 
 
-def main():
-    # 加载自定义CSS样式（在 set_page_config 之后）
-    load_custom_css()
-    
-    # 自定义标题区域
-    st.markdown("""
-        <div class="main-container">
-            <h1 class="main-title">总台收入工作台</h1>
-            <p class="sub-title">中式浪漫 · 财务报表处理系统</p>
-        </div>
-    """, unsafe_allow_html=True)
-
-    uploaded = st.file_uploader('上传 Excel（需含“工作表”和“总数”）', type=["xlsx", "xls"])
-
-    if not uploaded:
-        st.markdown("""
-            <div class="info-card">
-                <h3>📊 使用说明</h3>
-                <p>上传Excel文件后，您可以：</p>
-                <ul>
-                    <li>选择工作表/总数表、收入类型（单选/多选）</li>
-                    <li>编辑"分配表"，进行灵活的税费分配</li>
-                    <li>实时校验数据平衡性</li>
-                    <li>导出包含所有报表的汇总工作簿</li>
-                </ul>
-            </div>
-        """, unsafe_allow_html=True)
-        return
-
-    file_id = stable_file_id(uploaded)
-
-    # 保存临时文件供 scripts 使用
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp:
-        tmp.write(uploaded.getvalue())
-        tmp_path = Path(tmp.name)
-
+def render_uploaded_file(tmp_path: Path, file_id: str):
     sheet_names = get_sheet_names(tmp_path)
     default_work = pick_default_sheet(sheet_names, "工作表")
     default_total = pick_default_sheet(sheet_names, "总数")
@@ -448,7 +412,8 @@ def main():
             """, unsafe_allow_html=True)
 
             st.markdown("##### 🔄 透视分析（名称 × 项目）")
-            pivot = build_pivot(work_filtered)
+            if pivot.empty:
+                pivot = build_pivot(work_filtered)
             st.dataframe(pivot, use_container_width=True)
 
             st.markdown("##### ⚙️ 分配管理（可编辑：不计税 / 5% / 6%）")
@@ -462,6 +427,11 @@ def main():
                 key=f"editor:{state_prefix}",
                 num_rows="dynamic",
                 use_container_width=True,
+                column_config={
+                    "名称": st.column_config.TextColumn("名称", disabled=True),
+                    "项目": st.column_config.TextColumn("项目", disabled=True),
+                    "金额": st.column_config.NumberColumn("金额", disabled=True, format="%.2f"),
+                },
             )
             st.session_state[alloc_state_key] = alloc
 
@@ -571,8 +541,9 @@ def main():
         if work_filtered.empty:
             st.error("工作表数据不可用。")
         else:
-            tax_pivot = build_pivot(work_filtered)
-            st.dataframe(tax_pivot, use_container_width=True)
+            if pivot.empty:
+                pivot = build_pivot(work_filtered)
+            st.dataframe(pivot, use_container_width=True)
             st.markdown("""
                 <div style="background: rgba(255,255,255,0.8); padding: 1rem; border-radius: 8px; margin: 1rem 0;">
                     <strong>📝 说明：</strong>此透视为动态列（名称×项目），用于后续价税分离/对账场景；当前与"透视"一致（按多选类型合并）。
@@ -689,8 +660,48 @@ def main():
             </div>
         """, unsafe_allow_html=True)
 
-    # 清理临时文件（不影响导出：导出已在内存）
-    tmp_path.unlink(missing_ok=True)
+
+def main():
+    # 加载自定义CSS样式（在 set_page_config 之后）
+    load_custom_css()
+    
+    # 自定义标题区域
+    st.markdown("""
+        <div class="main-container">
+            <h1 class="main-title">总台收入工作台</h1>
+            <p class="sub-title">总台数据 · 财务报表处理系统</p>
+        </div>
+    """, unsafe_allow_html=True)
+
+    uploaded = st.file_uploader('上传 Excel（需含“工作表”和“总数”）', type=["xlsx", "xls"])
+
+    if not uploaded:
+        st.markdown("""
+            <div class="info-card">
+                <h3>📊 使用说明</h3>
+                <p>上传Excel文件后，您可以：</p>
+                <ul>
+                    <li>选择工作表/总数表、收入类型（单选/多选）</li>
+                    <li>编辑"分配表"，进行灵活的税费分配</li>
+                    <li>实时校验数据平衡性</li>
+                    <li>导出包含所有报表的汇总工作簿</li>
+                </ul>
+            </div>
+        """, unsafe_allow_html=True)
+        return
+
+    upload_bytes = uploaded.getvalue()
+    file_id = stable_file_id(upload_bytes)
+
+    tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+    tmp_path = Path(tmp_file.name)
+    tmp_file.close()
+    try:
+        tmp_path.write_bytes(upload_bytes)
+        render_uploaded_file(tmp_path, file_id)
+    finally:
+        # 清理临时文件（不影响导出：导出已在内存）
+        tmp_path.unlink(missing_ok=True)
 
 
 if __name__ == "__main__":
